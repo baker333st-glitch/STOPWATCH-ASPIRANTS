@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASPIRANTS - Stopwatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Inter:wght@300..800&family=JetBrains+Mono:wght@400..800&family=Space+Mono:wght@400;700&family=Rajdhani:wght@400..700&family=Share+Tech+Mono&family=Russo+One&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-slideIn { animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        body { background: #0f172a; margin: 0; overflow-x: hidden; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- React and Babel for single-file execution -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } = React;
+
+        const BACKGROUND_THEMES = [
+            { id: 'midnight', name: 'Midnight', emoji: '🌑', type: 'gradient', value: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)', overlay: '' },
+            { id: 'aurora', name: 'Aurora', emoji: '🌌', type: 'gradient', value: 'linear-gradient(135deg, #0c0a1a 0%, #1a0533 30%, #0d1b2a 60%, #051937 100%)', overlay: '' },
+            { id: 'galaxy', name: 'Galaxy', emoji: '🌠', type: 'image', value: 'https://images.pexels.com/photos/36633064/pexels-photo-36633064.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800', overlay: 'rgba(0,0,0,0.55)' },
+            { id: 'forest', name: 'Forest', emoji: '🌿', type: 'image', value: 'https://images.pexels.com/photos/13422073/pexels-photo-13422073.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800', overlay: 'rgba(0,0,0,0.55)' },
+            { id: 'ocean', name: 'Ocean', emoji: '🌊', type: 'image', value: 'https://images.pexels.com/photos/18415767/pexels-photo-18415767.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800', overlay: 'rgba(0,0,0,0.50)' }
+        ];
+
+        const FONT_THEMES = [
+            { id: 'orbitron', name: 'Orbitron', family: "'Orbitron', sans-serif" },
+            { id: 'inter', name: 'Inter', family: "'Inter', sans-serif" },
+            { id: 'jetbrains', name: 'JetBrains', family: "'JetBrains Mono', monospace" },
+            { id: 'space', name: 'Space', family: "'Space Mono', monospace" }
+        ];
+
+        function App() {
+            const [time, setTime] = useState(0);
+            const [status, setStatus] = useState('idle');
+            const [laps, setLaps] = useState([]);
+            const [bg, setBg] = useState(BACKGROUND_THEMES[0]);
+            const [font, setFont] = useState(FONT_THEMES[0]);
+            const [panel, setPanel] = useState(false);
+            
+            const timerRef = useRef(null);
+            const startTimeRef = useRef(0);
+            const accumRef = useRef(0);
+            const lapRef = useRef(0);
+
+            const format = (ms) => {
+                const s = Math.floor(ms / 1000);
+                const h = String(Math.floor(s / 3600)).padStart(2, '0');
+                const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+                const sec = String(s % 60).padStart(2, '0');
+                const cs = String(Math.floor((ms % 1000) / 10)).padStart(2, '0');
+                return { h, m, sec, cs };
+            };
+
+            const start = () => {
+                startTimeRef.current = performance.now();
+                if (status === 'idle') { accumRef.current = 0; lapRef.current = 0; setLaps([]); }
+                setStatus('running');
+                timerRef.current = setInterval(() => setTime(accumRef.current + (performance.now() - startTimeRef.current)), 10);
+            };
+
+            const pause = () => {
+                clearInterval(timerRef.current);
+                accumRef.current += performance.now() - startTimeRef.current;
+                setStatus('paused');
+            };
+
+            const reset = () => {
+                clearInterval(timerRef.current);
+                setTime(0); setLaps([]); setStatus('idle');
+            };
+
+            const addLap = () => {
+                const now = accumRef.current + (performance.now() - startTimeRef.current);
+                setLaps([{ id: laps.length + 1, lap: now - lapRef.current, split: now }, ...laps]);
+                lapRef.current = now;
+            };
+
+            const t = format(time);
+
+            return (
+                <div className="min-h-screen relative flex flex-col items-center text-white transition-all duration-700" style={{ fontFamily: font.family }}>
+                    {bg.type === 'gradient' ? 
+                        <div className="absolute inset-0 z-0" style={{ background: bg.value }} /> : 
+                        <><div className="absolute inset-0 z-0 bg-cover bg-center" style={{ backgroundImage: `url(${bg.value})` }} /><div className="absolute inset-0 z-0" style={{ backgroundColor: bg.overlay }} /></>
+                    }
+                    
+                    <div className="relative z-10 w-full max-w-lg px-6 py-10 flex flex-col items-center h-screen">
+                        <header className="flex justify-between w-full mb-10 items-center">
+                            <h1 className="text-3xl font-black tracking-widest text-indigo-400">ASPIRANTS</h1>
+                            <button onClick={() => setPanel(true)} className="p-3 bg-white/10 rounded-xl backdrop-blur-md border border-white/10">🎨</button>
+                        </header>
+
+                        <div className="relative mb-10">
+                            <div className={`w-72 h-72 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${status === 'running' ? 'border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.3)]' : 'border-white/20'}`}>
+                                <div className="text-center">
+                                    <div className="text-5xl font-bold">{t.h}:{t.m}:{t.sec}</div>
+                                    <div className="text-2xl text-emerald-400 mt-1">.{t.cs}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 mb-10">
+                            <button onClick={status === 'running' ? addLap : reset} className="w-16 h-16 rounded-full bg-white/10 border border-white/10 font-bold text-xs">{status === 'running' ? 'LAP' : 'RESET'}</button>
+                            <button onClick={status === 'running' ? pause : start} className={`w-20 h-20 rounded-full font-bold shadow-xl transition-all scale-110 ${status === 'running' ? 'bg-amber-500' : 'bg-emerald-500'}`}>{status === 'running' ? 'PAUSE' : 'START'}</button>
+                            <button onClick={pause} disabled={status !== 'running'} className="w-16 h-16 rounded-full bg-white/10 border border-white/10 font-bold text-xs opacity-50 disabled:opacity-20">STOP</button>
+                        </div>
+
+                        <div className="w-full flex-1 overflow-y-auto space-y-2 scrollbar-thin">
+                            {laps.map(l => (
+                                <div key={l.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex justify-between">
+                                    <span className="opacity-40">#{l.id}</span>
+                                    <span className="font-mono text-emerald-400">+{format(l.lap).m}:{format(l.lap).sec}.{format(l.lap).cs}</span>
+                                    <span className="font-mono opacity-60">{format(l.split).h}:{format(l.split).m}:{format(l.split).sec}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {panel && (
+                        <div className="fixed inset-0 z-50 flex justify-end">
+                            <div className="absolute inset-0 bg-black/60" onClick={() => setPanel(false)} />
+                            <div className="relative w-80 bg-slate-900 border-l border-white/10 p-6 animate-slideIn">
+                                <h2 className="text-xl font-bold mb-6">Themes</h2>
+                                <div className="space-y-4">
+                                    {BACKGROUND_THEMES.map(b => (
+                                        <button key={b.id} onClick={() => setBg(b)} className="w-full h-12 rounded-lg border border-white/10 flex items-center px-4 gap-3 hover:bg-white/5">
+                                            <span>{b.emoji}</span> {b.name}
+                                        </button>
+                                    ))}
+                                    <hr className="border-white/10" />
+                                    {FONT_THEMES.map(f => (
+                                        <button key={f.id} onClick={() => setFont(f)} className="w-full h-12 rounded-lg border border-white/10 flex items-center px-4 hover:bg-white/5" style={{ fontFamily: f.family }}>
+                                            {f.name} Font
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
